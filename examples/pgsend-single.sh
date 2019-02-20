@@ -49,7 +49,9 @@ pgset "udp_src_max 8000"
 pgset "udp_dst_min 63000"
 pgset "udp_dst_max 63000"
 pgset "count 100"
-pgset "delay 1000000000"
+pgset "offset 10000"
+pgset "delay 100000000"
+pgset "flowid 1"
 
 # Time to run
 PGDEV=/proc/net/pktgen/pgctrl
