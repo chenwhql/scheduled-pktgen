@@ -420,9 +420,9 @@ struct pktgen_dev {
 
 struct pktgen_hdr {
     __be32 pgh_magic;
-    __be32 flow_id;
     __be32 seq_num;
     __s64 time;
+    __be16 flow_id;
 };
 
 
@@ -3112,14 +3112,13 @@ static void pktgen_finalize_skb(struct pktgen_dev *pkt_dev, struct sk_buff *skb,
      * convert them to network byte order
      */
     pgh->pgh_magic = htonl(PKTGEN_MAGIC);
-    pgh->flow_id = htonl(pkt_dev->flowid);
     pgh->seq_num = htonl(pkt_dev->seq_num);
-
     if (pkt_dev->flags & F_NO_TIMESTAMP) {
         pgh->time = 0;
     } else {
         pgh->time = htonll(ktime_to_ns(ktime_get()));
     }
+    pgh->flow_id = htons(pkt_dev->flowid);
 }
 
 static struct sk_buff *pktgen_alloc_skb(struct net_device *dev,
