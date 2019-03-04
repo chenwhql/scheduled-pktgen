@@ -517,7 +517,7 @@ static void pktgen_clear_counters(struct pktgen_dev *pkt_dev);
 unsigned int pktgen_rcv_counter(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
 unsigned int pktgen_rcv_basic(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
 unsigned int pktgen_rcv_time(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
-static int pktgen_add_rx(struct pktgen_thread *t, const char *ifname);
+static int pktgen_add_rx(const char *ifname);
 static int pktgen_set_statistics(const char *f);
 static int pktgen_set_display(const char *f);
 static int pktgen_clean_rx(void);
@@ -2179,8 +2179,6 @@ static int pgrx_show(struct seq_file *seq, void *v)
 static ssize_t pgrx_write(struct file *file, const char __user * user_buffer,
                 size_t count, loff_t *ppos)
 {
-    struct seq_file *seq = file->private_data;
-    struct pktgen_thread *t = seq->private;
     int i = 0, max, len, ret;
     char name[40];
 
@@ -2230,7 +2228,7 @@ static ssize_t pgrx_write(struct file *file, const char __user * user_buffer,
 
         if (debug)
             printk(KERN_INFO "pktgen: Adding rx %s\n", f);
-        pktgen_add_rx(t, f);
+        pktgen_add_rx(f);
         ret = count;
         goto out;
     } else if (!strcmp(name, "rx_reset")) {
@@ -4220,14 +4218,15 @@ void pg_reset_rx(void)
     }
 }
 
-static int pktgen_add_rx(struct pktgen_thread *t, const char *ifname)
+static int pktgen_add_rx(const char *ifname)
 {
     int err = 0;
     struct net_device *idev = NULL;
+    struct pktgen_net *pn = net_generic(current->nsproxy->net_ns, pg_net_id);
 
     pg_reset_rx();
 
-    idev = dev_get_by_name(t->net, ifname);
+    idev = dev_get_by_name(pn->net, ifname);
 
     if (!idev)
         printk(KERN_INFO
@@ -4396,10 +4395,13 @@ unsigned int pktgen_rcv_counter(void *priv, struct sk_buff *skb, const struct nf
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
 
+    /*
     if (unlikely(pgh->pgh_magic != PKTGEN_MAGIC_NET)){
         ret = NF_ACCEPT;
         goto end;
     }
+    */
+
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
     /* Update counter of packets*/
     data_cpu->rx_packets++;
@@ -4418,10 +4420,12 @@ unsigned int pktgen_rcv_time(void *priv, struct sk_buff *skb, const struct nf_ho
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
 
+    /*
     if (unlikely(pgh->pgh_magic != PKTGEN_MAGIC_NET)){
         ret = NF_ACCEPT;
         goto end;
     }
+    */
 
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
 
@@ -4445,10 +4449,17 @@ unsigned int pktgen_rcv_basic(void *priv, struct sk_buff *skb, const struct nf_h
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
 
+    /*
     if (unlikely(pgh->pgh_magic != PKTGEN_MAGIC_NET)){
         ret = NF_ACCEPT;
+        printk(KERN_INFO "pktgen: pgh_magic %x\n", ntohl(pgh->pgh_magic));
+        printk(KERN_INFO "pktgen: PKTGEN_MAGIC_NET %x\n", PKTGEN_MAGIC_NET);
+        printk(KERN_INFO "pktgen: seq_num %x\n", ntohl(pgh->seq_num));
+        printk(KERN_INFO "pktgen: time %x\n", pgh->time);
+        printk(KERN_INFO "pktgen: flow id %x\n", ntohs(pgh->flow_id));
         goto end;
     }
+    */
 
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
 
