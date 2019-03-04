@@ -9,7 +9,7 @@
 # load schedule parameters
 echo "Load TT schedule parameters"
 schedule_path="/home/chenwh/Workspace/Data/minimal"
-result=$(python load_tt_sched_info.py $schedule_path 1)
+result=$(python load_tt_sched_info.py $schedule_path 2)
 info=($result)
 if_id=${info[0]}
 flow_id=${info[1]}
@@ -41,22 +41,22 @@ function pg() {
 # thread config
 # Each CPU has own thread. Two CPU exammple.
 
-PGDEV=/proc/net/pktgen/kpktgend_0
+PGDEV=/proc/net/pktgen/kpktgend_1
 echo "Removing all devices"
 pgset "rem_device_all" 
-echo "Adding h1-eth0"
-pgset "add_device h1-eth0" 
+echo "Adding h2-eth0"
+pgset "add_device h2-eth0" 
 echo "Setting max_before_softirq 1"
 pgset "max_before_softirq 1"
 
-PGDEV=/proc/net/pktgen/h1-eth0
+PGDEV=/proc/net/pktgen/h2-eth0
 echo "Configuring $PGDEV"
 
 #pgset "clone_skb 1000"
 pgset "pkt_size $pkt_size"
-pgset "src_min 10.0.0.1"
-pgset "src_max 10.0.0.1"
-pgset "dst 10.0.0.2"
+pgset "src_min 10.0.0.2"
+pgset "src_max 10.0.0.2"
+pgset "dst 10.0.0.1"
 pgset "udp_src_min 8000"
 pgset "udp_src_max 8000"
 pgset "udp_dst_min 63000"

@@ -517,7 +517,7 @@ static void pktgen_clear_counters(struct pktgen_dev *pkt_dev);
 unsigned int pktgen_rcv_counter(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
 unsigned int pktgen_rcv_basic(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
 unsigned int pktgen_rcv_time(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
-static int pktgen_add_rx(const char *ifname);
+static int pktgen_add_rx(struct pktgen_thread *t, const char *ifname);
 static int pktgen_set_statistics(const char *f);
 static int pktgen_set_display(const char *f);
 static int pktgen_clean_rx(void);
@@ -2179,6 +2179,8 @@ static int pgrx_show(struct seq_file *seq, void *v)
 static ssize_t pgrx_write(struct file *file, const char __user * user_buffer,
                 size_t count, loff_t *ppos)
 {
+    struct seq_file *seq = file->private_data;
+    struct pktgen_thread *t = seq->private;
     int i = 0, max, len, ret;
     char name[40];
 
@@ -2228,7 +2230,7 @@ static ssize_t pgrx_write(struct file *file, const char __user * user_buffer,
 
         if (debug)
             printk(KERN_INFO "pktgen: Adding rx %s\n", f);
-        pktgen_add_rx(f);
+        pktgen_add_rx(t, f);
         ret = count;
         goto out;
     } else if (!strcmp(name, "rx_reset")) {
@@ -3423,8 +3425,21 @@ static void pktgen_clear_counters(struct pktgen_dev *pkt_dev)
     pkt_dev->errors = 0;
 }
 
-/* Set up structure for sending pkts, clear counters */
+static u64 get_first_tx_time(struct pktgen_dev *pkt_dev)
+{
+    u64 first_tx_time;
+    u64 mod_time;
 
+    mod_time = ktime_to_ns(ktime_get()) % pkt_dev->delay;
+    if (mod_time > pkt_dev->offset) {
+        first_tx_time = pkt_dev->delay - mod_time + pkt_dev->offset;
+    } else {
+        first_tx_time = pkt_dev->offset - mod_time;
+    }
+    return first_tx_time;
+}
+
+/* Set up structure for sending pkts, clear counters */
 static void pktgen_run(struct pktgen_thread *t)
 {
     struct pktgen_dev *pkt_dev;
@@ -3444,7 +3459,7 @@ static void pktgen_run(struct pktgen_thread *t)
             pktgen_clear_counters(pkt_dev);
             pkt_dev->skb = NULL;
             pkt_dev->started_at = pkt_dev->next_tx = 
-                ktime_add_ns(ktime_get(), pkt_dev->offset);
+                ktime_add_ns(ktime_get(), get_first_tx_time(pkt_dev));
 
             set_pkt_overhead(pkt_dev);
 
@@ -4205,14 +4220,14 @@ void pg_reset_rx(void)
     }
 }
 
-static int pktgen_add_rx(const char *ifname)
+static int pktgen_add_rx(struct pktgen_thread *t, const char *ifname)
 {
     int err = 0;
     struct net_device *idev = NULL;
 
     pg_reset_rx();
 
-    idev = dev_get_by_name(&init_net, ifname);
+    idev = dev_get_by_name(t->net, ifname);
 
     if (!idev)
         printk(KERN_INFO
