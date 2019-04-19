@@ -19,7 +19,7 @@ function pgset() {
 # Reception configuration
 PGDEV=/proc/net/pktgen/pgrx
 dev=h2-eth0
-#mode=counter
+mode=time
 
 # pgset "debug 1"
 echo "Removing old config"
@@ -29,7 +29,7 @@ pgset "rx $dev"
 #echo "Setting statistics $mode"
 #pgset "statistics $mode"
 #pgset "display human"
-# pgset "display script"
+#pgset "display script"
 
 # Result can be vieved in /proc/net/pktgen/eth1
 #cat /proc/net/pktgen/pgrx

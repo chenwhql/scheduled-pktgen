@@ -514,9 +514,9 @@ static void pktgen_stop(struct pktgen_thread *t);
 static void pktgen_clear_counters(struct pktgen_dev *pkt_dev);
 
 /*Receiver functions*/
-unsigned int pktgen_rcv_counter(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
-unsigned int pktgen_rcv_basic(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
-unsigned int pktgen_rcv_time(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
+unsigned int pktgen_rcv_counter(const struct nf_hook_ops *ops, struct sk_buff *skb, const struct nf_hook_state *state);
+unsigned int pktgen_rcv_basic(const struct nf_hook_ops *ops, struct sk_buff *skb, const struct nf_hook_state *state);
+unsigned int pktgen_rcv_time(const struct nf_hook_ops *ops, struct sk_buff *skb, const struct nf_hook_state *state);
 static int pktgen_add_rx(const char *ifname);
 static int pktgen_set_statistics(const char *f);
 static int pktgen_set_display(const char *f);
@@ -545,7 +545,7 @@ static struct nf_hook_ops nfho __read_mostly = {
     .hook = pktgen_rcv_basic,
     .hooknum = NF_INET_PRE_ROUTING,
     .pf = PF_INET,
-    .priority = 1,
+    .priority = NF_IP_PRI_FIRST,
     //.owner = THIS_MODULE,
 };
 
@@ -4239,6 +4239,7 @@ static int pktgen_add_rx(const char *ifname)
         pg_rx_global->display_option = PG_DISPLAY_HUMAN;
 
         nfho.hook = pktgen_rcv_basic;
+        nfho.dev = idev;
         nf_register_hook(&nfho);
         //dev_add_pack(&pktgen_packet_type);
         err = 0;
@@ -4387,7 +4388,7 @@ static int latency_calc(struct pktgen_hdr *pgh, ktime_t now,
 }
 
 /*Reception function*/
-unsigned int pktgen_rcv_counter(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
+unsigned int pktgen_rcv_counter(const struct nf_hook_ops *ops, struct sk_buff *skb, const struct nf_hook_state *state)
 {
     struct pktgen_hdr *pgh;
     struct pktgen_rx *data_cpu;
@@ -4395,12 +4396,10 @@ unsigned int pktgen_rcv_counter(void *priv, struct sk_buff *skb, const struct nf
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
 
-    /*
     if (unlikely(pgh->pgh_magic != PKTGEN_MAGIC_NET)){
         ret = NF_ACCEPT;
         goto end;
     }
-    */
 
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
     /* Update counter of packets*/
@@ -4411,7 +4410,7 @@ end:
     return ret;
 }
 
-unsigned int pktgen_rcv_time(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
+unsigned int pktgen_rcv_time(const struct nf_hook_ops *ops, struct sk_buff *skb, const struct nf_hook_state *state)
 {
     struct pktgen_hdr *pgh;
     struct pktgen_rx *data_cpu;
@@ -4420,12 +4419,10 @@ unsigned int pktgen_rcv_time(void *priv, struct sk_buff *skb, const struct nf_ho
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
 
-    /*
     if (unlikely(pgh->pgh_magic != PKTGEN_MAGIC_NET)){
         ret = NF_ACCEPT;
         goto end;
     }
-    */
 
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
 
@@ -4441,7 +4438,7 @@ end:
     return ret;
 }
 
-unsigned int pktgen_rcv_basic(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
+unsigned int pktgen_rcv_basic(const struct nf_hook_ops *ops, struct sk_buff *skb, const struct nf_hook_state *state)
 {
     struct pktgen_hdr *pgh;
     struct pktgen_rx *data_cpu;
@@ -4449,17 +4446,10 @@ unsigned int pktgen_rcv_basic(void *priv, struct sk_buff *skb, const struct nf_h
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
 
-    /*
     if (unlikely(pgh->pgh_magic != PKTGEN_MAGIC_NET)){
         ret = NF_ACCEPT;
-        printk(KERN_INFO "pktgen: pgh_magic %x\n", ntohl(pgh->pgh_magic));
-        printk(KERN_INFO "pktgen: PKTGEN_MAGIC_NET %x\n", PKTGEN_MAGIC_NET);
-        printk(KERN_INFO "pktgen: seq_num %x\n", ntohl(pgh->seq_num));
-        printk(KERN_INFO "pktgen: time %x\n", pgh->time);
-        printk(KERN_INFO "pktgen: flow id %x\n", ntohs(pgh->flow_id));
         goto end;
     }
-    */
 
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
 
