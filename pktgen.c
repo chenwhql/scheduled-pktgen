@@ -773,7 +773,7 @@ static int pktgen_if_show(struct seq_file *seq, void *v)
     seq_puts(seq, "\n");
 
     /* not really stopped, more like last-running-at */
-    stopped = pkt_dev->running ? ktime_get() : pkt_dev->stopped_at;
+    stopped = pkt_dev->running ? ktime_get_real() : pkt_dev->stopped_at;
     idle = pkt_dev->idle_acc;
     do_div(idle, NSEC_PER_USEC);
 
@@ -2598,7 +2598,7 @@ static void spin(struct pktgen_dev *pkt_dev, ktime_t spin_until)
     s64 remaining;
     struct hrtimer_sleeper t;
 
-    hrtimer_init_on_stack(&t.timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+    hrtimer_init_on_stack(&t.timer, CLOCK_REALTIME, HRTIMER_MODE_ABS);
     hrtimer_set_expires(&t.timer, spin_until);
 
     remaining = ktime_to_ns(hrtimer_expires_remaining(&t.timer));
@@ -2607,11 +2607,11 @@ static void spin(struct pktgen_dev *pkt_dev, ktime_t spin_until)
         return;
     }
 
-    start_time = ktime_get();
+    start_time = ktime_get_real();
     if (remaining < 100000) {
         /* for small delays (<100us), just loop until limit is reached */
         do {
-            end_time = ktime_get();
+            end_time = ktime_get_real();
         } while (ktime_compare(end_time, spin_until) < 0);
     } else {
         /* see do_nanosleep */
@@ -2626,7 +2626,7 @@ static void spin(struct pktgen_dev *pkt_dev, ktime_t spin_until)
             hrtimer_cancel(&t.timer);
         } while (t.task && pkt_dev->running && !signal_pending(current));
         __set_current_state(TASK_RUNNING);
-        end_time = ktime_get();
+        end_time = ktime_get_real();
     }
 
     pkt_dev->idle_acc += ktime_to_ns(ktime_sub(end_time, start_time));
@@ -3116,7 +3116,7 @@ static void pktgen_finalize_skb(struct pktgen_dev *pkt_dev, struct sk_buff *skb,
     if (pkt_dev->flags & F_NO_TIMESTAMP) {
         pgh->time = 0;
     } else {
-        pgh->time = htonll(ktime_to_ns(ktime_get()));
+        pgh->time = htonll(ktime_to_ns(ktime_get_real()));
     }
     pgh->flow_id = htons(pkt_dev->flowid);
 }
@@ -3428,7 +3428,7 @@ static u64 get_first_tx_time(struct pktgen_dev *pkt_dev)
     u64 first_tx_time;
     u64 mod_time;
 
-    mod_time = ktime_to_ns(ktime_get()) % pkt_dev->delay;
+    mod_time = ktime_to_ns(ktime_get_real()) % pkt_dev->delay;
     if (mod_time > pkt_dev->offset) {
         first_tx_time = pkt_dev->delay - mod_time + pkt_dev->offset;
     } else {
@@ -3457,7 +3457,7 @@ static void pktgen_run(struct pktgen_thread *t)
             pktgen_clear_counters(pkt_dev);
             pkt_dev->skb = NULL;
             pkt_dev->started_at = pkt_dev->next_tx = 
-                ktime_add_ns(ktime_get(), get_first_tx_time(pkt_dev));
+                ktime_add_ns(ktime_get_real(), get_first_tx_time(pkt_dev));
 
             set_pkt_overhead(pkt_dev);
 
@@ -3619,7 +3619,7 @@ static int pktgen_stop_device(struct pktgen_dev *pkt_dev)
     pkt_dev->running = 0;
     kfree_skb(pkt_dev->skb);
     pkt_dev->skb = NULL;
-    pkt_dev->stopped_at = ktime_get();
+    pkt_dev->stopped_at = ktime_get_real();
     pkt_dev->running = 0;
 
     show_results(pkt_dev, nr_frags);
@@ -3713,14 +3713,14 @@ static void pktgen_rem_thread(struct pktgen_thread *t)
 
 static void pktgen_resched(struct pktgen_dev *pkt_dev)
 {
-    ktime_t idle_start = ktime_get();
+    ktime_t idle_start = ktime_get_real();
     schedule();
-    pkt_dev->idle_acc += ktime_to_ns(ktime_sub(ktime_get(), idle_start));
+    pkt_dev->idle_acc += ktime_to_ns(ktime_sub(ktime_get_real(), idle_start));
 }
 
 static void pktgen_wait_for_skb(struct pktgen_dev *pkt_dev)
 {
-    ktime_t idle_start = ktime_get();
+    ktime_t idle_start = ktime_get_real();
 
     while (atomic_read(&(pkt_dev->skb->users)) != 1) {
         if (signal_pending(current))
@@ -3731,7 +3731,7 @@ static void pktgen_wait_for_skb(struct pktgen_dev *pkt_dev)
         else
             cpu_relax();
     }
-    pkt_dev->idle_acc += ktime_to_ns(ktime_sub(ktime_get(), idle_start));
+    pkt_dev->idle_acc += ktime_to_ns(ktime_sub(ktime_get_real(), idle_start));
 }
 
 static void pktgen_xmit(struct pktgen_dev *pkt_dev)
@@ -3752,7 +3752,7 @@ static void pktgen_xmit(struct pktgen_dev *pkt_dev)
      * "never transmit"
      */
     if (unlikely(pkt_dev->delay == ULLONG_MAX)) {
-        pkt_dev->next_tx = ktime_add_ns(ktime_get(), ULONG_MAX);
+        pkt_dev->next_tx = ktime_add_ns(ktime_get_real(), ULONG_MAX);
         return;
     }
 
@@ -4414,7 +4414,7 @@ unsigned int pktgen_rcv_time(const struct nf_hook_ops *ops, struct sk_buff *skb,
 {
     struct pktgen_hdr *pgh;
     struct pktgen_rx *data_cpu;
-    ktime_t now = ktime_get();
+    ktime_t now = ktime_get_real();
     int ret = NF_DROP;
 
     pgh = (struct pktgen_hdr *)(((char *)(skb_transport_header(skb))) + 8);
@@ -4453,7 +4453,7 @@ unsigned int pktgen_rcv_basic(const struct nf_hook_ops *ops, struct sk_buff *skb
 
     data_cpu = this_cpu_ptr(&pktgen_rx_data);
 
-    throughput_data(ktime_get(), data_cpu);
+    throughput_data(ktime_get_real(), data_cpu);
 
     /*update counter of packets*/
     data_cpu->rx_packets++;
