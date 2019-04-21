@@ -8,7 +8,7 @@
 
 # load schedule parameters
 echo "Load TT schedule parameters"
-schedule_path="/home/chenwh/Workspace/Data/minimal"
+schedule_path="/home/chenwh/Workspace/data/minimal"
 result=$(python load_tt_sched_info.py $schedule_path 1)
 info=($result)
 if_id=${info[0]}
